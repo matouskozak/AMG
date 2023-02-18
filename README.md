@@ -1,5 +1,7 @@
 # Adversarial Malware Generator (AMG)
-Adversarial malware generator (AMG) for attacking the GBDT classifier.
+Adversarial malware generator (AMG) for attacking the GBDT classifier. This repository contains source codes for my final thesis defended at CTU in Prague. TBU link to thesis
+
+
 ## Setup
 ### Environment
 To install all necesarry Python libraries, use the provided Conda environment file *amg-env.yml*.
