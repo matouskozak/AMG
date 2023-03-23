@@ -129,7 +129,7 @@ if __name__ == "__main__":
         bytez = interface.fetch_file(sha256)
         label = env.label_function(bytez)
         original_size = len(bytez)#interface.get_size_sha256(sha256)
-        output_path = os.path.join(save_folder, sha256)
+        #output_path = os.path.join(save_folder, sha256)
 
         print(f"File {i + 1}/{total} - {sha256}") 
         
@@ -147,7 +147,7 @@ if __name__ == "__main__":
             num_skipped += 1
 
             if args.save_files:
-                with open(output_path, 'wb') as outfile:
+                with open(os.path.join(save_folder, f"{sha256}_skip"), 'wb') as outfile:
                     outfile.write(bytez)
 
             continue
@@ -162,7 +162,7 @@ if __name__ == "__main__":
         while not done:
             prev_obs = obs
             action = agent.compute_single_action(obs)
-            #action = random.randint(0, 9) # random agent
+            #action = random.randint(0, 9) # RANDOM agent
             obs, reward, done, info = env.step(action)
             episode_reward += reward
 
@@ -173,7 +173,7 @@ if __name__ == "__main__":
             num_evaded += 1
 
         if args.save_files:
-            with open(output_path, 'wb') as outfile:
+            with open( os.path.join(save_folder, f'{sha256}{"_evasive" if info["evaded"] else "_fail"}'), 'wb') as outfile:
                 outfile.write(info['bytez'])
 
         new_size = len(info['bytez']) #interface.get_size(output_path)
