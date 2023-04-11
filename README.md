@@ -17,3 +17,6 @@ For testing use *RAY_test_from_checkpoint* file. Usage: `python RAY_test_from_ch
 
 As configs and checkpoints you can use files from the *BEST_AGENTS* folder. This folder contains config files and checkpoints for each of the tested RL algorithms (DQN, PG, PPO).
 
+---
+By uncommenting line 165 in the *RAY_test_from_checkpoint.py* file, you can run experiments with a random AMG agent, i.e., an agent that chooses AMG file manipulations at random.
+
