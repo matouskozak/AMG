@@ -1,5 +1,5 @@
 # Adversarial Malware Generator (AMG)
-Adversarial malware generator (AMG) for attacking the GBDT classifier. This repository contains source codes for my final thesis defended at CTU in Prague. TBU link to thesis
+Adversarial malware generator (AMG) for attacking the GBDT classifier. This repository contains source codes for my final thesis defended at CTU in Prague and research paper published in JICV (https://doi.org/10.1007/s11416-024-00516-2).
 
 
 ## Setup
