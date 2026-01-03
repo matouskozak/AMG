@@ -4,7 +4,24 @@ Adversarial malware generator (AMG) for attacking the GBDT classifier. This repo
 
 ## Setup
 ### Environment
-To install all necesarry Python libraries, use the provided Conda environment file *amg-env.yml*.
+This project uses [uv](https://github.com/astral-sh/uv) for fast, reliable package management.
+
+#### Install uv
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+#### Setup the environment
+```bash
+# Create a virtual environment and install dependencies
+uv sync
+
+# Activate the virtual environment
+source .venv/bin/activate
+```
+
+#### Legacy Conda setup (deprecated)
+If you prefer using Conda, the original environment file *amg-env.yml* is still available.
 ### PE Files
 Place your binary sample into *gym_malware/envs/utils/samples* folder. Make 3 folders there: *train*, *test* and *all* (all samples combined). To switch between validation and final testing phase, change the content of *test* folder
 
