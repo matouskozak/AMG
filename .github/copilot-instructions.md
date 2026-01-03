@@ -1,0 +1,2 @@
+- Never install dependencies without activate local environment (`source .venv/bin/activate`), manage dependencies via `uv add` (preferably) or `uv pip install`
+- Keep code comments to a minimum and only highlight particularly logically challenging things
