@@ -152,18 +152,33 @@ class TestRemoveDebug:
     
     def test_remove_debug(self, basic_pe, temp_dir):
         """Test removing debug directory."""
+        # First check if the input file has debug info
+        pe_input = pefile.PE(basic_pe)
+        debug_va = 0
+        debug_size = 0
+        for d in pe_input.OPTIONAL_HEADER.DATA_DIRECTORY:
+            if d.name == 'IMAGE_DIRECTORY_ENTRY_DEBUG':
+                debug_va = d.VirtualAddress
+                debug_size = d.Size
+                break
+        
         manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
         output_path = manipulator.remove_debug()
         
         assert os.path.exists(output_path)
         
-        # Verify debug directory is cleared
+        # Verify debug directory is cleared in header
         pe = pefile.PE(output_path)
         for d in pe.OPTIONAL_HEADER.DATA_DIRECTORY:
             if d.name == 'IMAGE_DIRECTORY_ENTRY_DEBUG':
                 assert d.VirtualAddress == 0
                 assert d.Size == 0
                 break
+        
+        # Verify debug directory table content is zeroed if it existed
+        if debug_va > 0 and debug_size > 0:
+            debug_table_bytes = pe.get_data(debug_va, debug_size)
+            assert debug_table_bytes == b'\x00' * debug_size, "Debug directory table should be zeroed out"
                 
     def test_remove_debug_file_still_valid(self, basic_pe, temp_dir):
         """Test remove_debug on file without debug directory."""
