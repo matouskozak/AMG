@@ -1,3 +1,6 @@
 # Python
 *.pyc
 __pycache__/
+
+gym_malware/envs/utils/samples/
+test_binaries/

@@ -5,12 +5,17 @@ description = "Adversarial Malware Generator (AMG)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "gym>=0.26.2",
-    "lief>=0.17.1",
+    "gym==0.23.1",
+    "lief==0.12.2",
     "lightgbm>=4.6.0",
+    "numpy<2",
     "pefile>=2024.8.26",
-    "ray[tune]>=2.53.0",
-    "scikit-learn>=1.7.2",
+    "pydantic<2",
+    "ray[rllib,tune]==2.0.1",
+    "scikit-learn==1.1.3",
+    "setuptools>=80.9.0",
+    "signify==0.7.1",
+    "tensorflow==2.10.0",
     "torch>=2.9.1",
 ]
 

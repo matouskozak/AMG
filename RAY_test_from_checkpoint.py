@@ -36,6 +36,8 @@ parser.add_argument("--params", type=str, required=True, help="Path to 'params.j
 parser.add_argument("--name", type=str, default="RAY_test", help="Name of the experiment.")
 parser.add_argument("--save-files", type=bool, default=False, help="Indicate wheter to save adversarial samples.")
 
+parser.add_argument("--random", action="store_true", default=False, help="Use random agent instead of trained agent.")
+
 parser.add_argument("--num-cpus", type=int, default=1)
 parser.add_argument("--num-gpus", type=int, default=0)
 parser.add_argument("--num-workers", type=int, default=0)
@@ -161,8 +163,7 @@ if __name__ == "__main__":
 
         while not done:
             prev_obs = obs
-            action = agent.compute_single_action(obs)
-            #action = random.randint(0, 9) # RANDOM agent
+            action = random.randint(0, 9) if args.random else agent.compute_single_action(obs)
             obs, reward, done, info = env.step(action)
             episode_reward += reward
 
