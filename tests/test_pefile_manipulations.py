@@ -474,11 +474,224 @@ class TestAppendImports:
     """Tests for append_imports functionality."""
     
     def test_append_imports(self, basic_pe, temp_dir):
-        """Test appending imports."""
+        """Test appending imports creates valid PE with new .idata section."""
         manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
         output_path = manipulator.append_imports()
         
         assert os.path.exists(output_path)
+        
+        pe = pefile.PE(output_path)
+        assert pe is not None
+        
+    def test_append_imports_adds_idata_section(self, basic_pe, temp_dir):
+        """Test that append_imports adds a new .idata section."""
+        original_pe = pefile.PE(basic_pe)
+        original_num_sections = len(original_pe.sections)
+        
+        manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
+        output_path = manipulator.append_imports()
+        
+        pe = pefile.PE(output_path)
+        assert len(pe.sections) == original_num_sections + 1
+        
+        new_section = pe.sections[-1]
+        assert new_section.Name.rstrip(b'\x00') == b'.idata'
+        
+    def test_append_imports_updates_import_directory(self, basic_pe, temp_dir):
+        """Test that Import Directory points to new section."""
+        manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
+        output_path = manipulator.append_imports()
+        
+        pe = pefile.PE(output_path)
+        new_section = pe.sections[-1]
+        
+        for d in pe.OPTIONAL_HEADER.DATA_DIRECTORY:
+            if d.name == 'IMAGE_DIRECTORY_ENTRY_IMPORT':
+                assert d.VirtualAddress == new_section.VirtualAddress
+                assert d.Size > 0
+                break
+                
+    def test_append_imports_old_idt_zeroed(self, basic_pe, temp_dir):
+        """Test that old IDT location is zeroed after copying."""
+        original_pe = pefile.PE(basic_pe)
+        old_idt_rva = 0
+        IMPORT_ENTRY_SIZE = 20
+        
+        for d in original_pe.OPTIONAL_HEADER.DATA_DIRECTORY:
+            if d.name == 'IMAGE_DIRECTORY_ENTRY_IMPORT':
+                old_idt_rva = d.VirtualAddress
+                break
+        
+        if old_idt_rva == 0:
+            pytest.skip("Test PE has no imports to zero")
+        
+        # Calculate actual IDT size by counting entries
+        old_idt_offset = original_pe.get_physical_by_rva(old_idt_rva)
+        idt_data = original_pe.__data__[old_idt_offset:]
+        num_entries = 0
+        pos = 0
+        while pos < len(idt_data):
+            entry = idt_data[pos:pos + IMPORT_ENTRY_SIZE]
+            if len(entry) < IMPORT_ENTRY_SIZE or all(b == 0 for b in entry):
+                break
+            num_entries += 1
+            pos += IMPORT_ENTRY_SIZE
+        
+        if num_entries == 0:
+            pytest.skip("Test PE has no IDT entries to zero")
+        
+        actual_idt_size = (num_entries + 1) * IMPORT_ENTRY_SIZE  # Include null terminator
+        
+        manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
+        output_path = manipulator.append_imports()
+        
+        pe = pefile.PE(output_path)
+        new_idt_offset = pe.get_physical_by_rva(old_idt_rva)
+        old_idt_bytes = pe.__data__[new_idt_offset:new_idt_offset + actual_idt_size]
+        
+        assert all(b == 0 for b in old_idt_bytes), "Old IDT location should be zeroed"
+        
+    def test_append_imports_preserves_old_imports(self, basic_pe, temp_dir):
+        """Test that old imports are preserved in new IDT."""
+        original_pe = pefile.PE(basic_pe)
+        
+        if not hasattr(original_pe, 'DIRECTORY_ENTRY_IMPORT') or not original_pe.DIRECTORY_ENTRY_IMPORT:
+            pytest.skip("Test PE has no imports")
+        
+        original_dlls = {entry.dll.decode().lower() for entry in original_pe.DIRECTORY_ENTRY_IMPORT}
+        
+        manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
+        output_path = manipulator.append_imports()
+        
+        pe = pefile.PE(output_path)
+        
+        if not hasattr(pe, 'DIRECTORY_ENTRY_IMPORT') or not pe.DIRECTORY_ENTRY_IMPORT:
+            pytest.fail("Modified PE has no imports")
+        
+        new_dlls = {entry.dll.decode().lower() for entry in pe.DIRECTORY_ENTRY_IMPORT}
+        
+        assert original_dlls.issubset(new_dlls), "Original DLLs should be preserved"
+        
+    def test_append_imports_adds_new_dll(self, basic_pe, temp_dir):
+        """Test that at least one new DLL is added."""
+        original_pe = pefile.PE(basic_pe)
+        
+        original_dlls = set()
+        if hasattr(original_pe, 'DIRECTORY_ENTRY_IMPORT') and original_pe.DIRECTORY_ENTRY_IMPORT:
+            original_dlls = {entry.dll.decode().lower() for entry in original_pe.DIRECTORY_ENTRY_IMPORT}
+        
+        manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
+        output_path = manipulator.append_imports()
+        
+        pe = pefile.PE(output_path)
+        
+        if not hasattr(pe, 'DIRECTORY_ENTRY_IMPORT') or not pe.DIRECTORY_ENTRY_IMPORT:
+            pytest.fail("Modified PE has no imports")
+        
+        new_dlls = {entry.dll.decode().lower() for entry in pe.DIRECTORY_ENTRY_IMPORT}
+        
+        assert len(new_dlls) > len(original_dlls), "Should have added at least one new DLL"
+        
+    def test_append_imports_idt_size_includes_all_entries(self, basic_pe, temp_dir):
+        """Test that IDT size in Data Directory is correct."""
+        IMPORT_ENTRY_SIZE = 20
+        
+        manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
+        output_path = manipulator.append_imports()
+        
+        pe = pefile.PE(output_path)
+        
+        if not hasattr(pe, 'DIRECTORY_ENTRY_IMPORT') or not pe.DIRECTORY_ENTRY_IMPORT:
+            pytest.fail("Modified PE has no imports")
+        
+        num_dlls = len(pe.DIRECTORY_ENTRY_IMPORT)
+        expected_size = (num_dlls + 1) * IMPORT_ENTRY_SIZE
+        
+        for d in pe.OPTIONAL_HEADER.DATA_DIRECTORY:
+            if d.name == 'IMAGE_DIRECTORY_ENTRY_IMPORT':
+                assert d.Size >= expected_size, f"IDT size {d.Size} should be >= {expected_size}"
+                break
+                
+    def test_append_imports_section_characteristics(self, basic_pe, temp_dir):
+        """Test that .idata section has correct characteristics."""
+        manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
+        output_path = manipulator.append_imports()
+        
+        pe = pefile.PE(output_path)
+        new_section = pe.sections[-1]
+        
+        characteristics = new_section.Characteristics
+        assert characteristics & 0x40000000, "Section should be readable (IMAGE_SCN_MEM_READ)"
+        assert characteristics & 0x40, "Section should contain initialized data"
+        
+    def test_append_imports_twice(self, basic_pe, temp_dir):
+        """Test appending imports twice produces valid PE."""
+        manipulator1 = PefileManipulator(basic_pe, temp_dir, verbose=False)
+        path1 = manipulator1.append_imports()
+        
+        pe1 = pefile.PE(path1)
+        num_sections_after_first = len(pe1.sections)
+        
+        manipulator2 = PefileManipulator(path1, temp_dir, verbose=False)
+        path2 = manipulator2.append_imports()
+        
+        pe2 = pefile.PE(path2)
+        assert pe2 is not None
+        assert len(pe2.sections) == num_sections_after_first + 1
+        
+    def test_append_imports_no_space_for_header(self, basic_pe, temp_dir):
+        """Test handling when no space for new section header."""
+        pe = pefile.PE(basic_pe)
+        
+        section_entry_size = 40
+        first_section_offset = pe.sections[0].PointerToRawData
+        last_section_header_end = pe.sections[-1].get_file_offset() + section_entry_size
+        available_space = first_section_offset - last_section_header_end
+        
+        if available_space >= section_entry_size:
+            pytest.skip("Test PE has space for new section header")
+        
+        manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
+        output_path = manipulator.append_imports()
+        
+        assert os.path.exists(output_path)
+        with open(basic_pe, 'rb') as f:
+            original = f.read()
+        with open(output_path, 'rb') as f:
+            modified = f.read()
+        assert original == modified, "File should be unchanged when no space"
+        
+    def test_append_imports_overlay_preserved(self, basic_pe, temp_dir):
+        """Test that overlay data is preserved after append_imports."""
+        overlay_data = b'OVERLAY_TEST_DATA_12345'
+        
+        with open(basic_pe, 'ab') as f:
+            f.write(overlay_data)
+        
+        manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
+        output_path = manipulator.append_imports()
+        
+        pe = pefile.PE(output_path)
+        result_overlay = pe.get_overlay()
+        
+        assert result_overlay is not None, "Overlay should be preserved"
+        assert overlay_data in result_overlay, "Original overlay content should be present"
+        
+    def test_append_imports_from_common_imports(self, basic_pe, temp_dir):
+        """Test that imports come from COMMON_IMPORTS dictionary."""
+        manipulator = PefileManipulator(basic_pe, temp_dir, verbose=False)
+        output_path = manipulator.append_imports()
+        
+        pe = pefile.PE(output_path)
+        
+        if not hasattr(pe, 'DIRECTORY_ENTRY_IMPORT') or not pe.DIRECTORY_ENTRY_IMPORT:
+            pytest.fail("Modified PE has no imports")
+        
+        new_dlls = [entry.dll.decode().lower().replace('\x00', '') for entry in pe.DIRECTORY_ENTRY_IMPORT]
+        common_dll_names = [dll.lower() for dll in COMMON_IMPORTS.keys()]
+        
+        has_common_dll = any(dll in common_dll_names for dll in new_dlls)
+        assert has_common_dll, "At least one import should come from COMMON_IMPORTS"
 
 
 class TestModifyPEFile:
